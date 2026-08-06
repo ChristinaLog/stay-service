@@ -1,0 +1,1130 @@
+openapi: 3.0.4
+info:
+  title: StayService API
+  description: |
+    API для системы автоматизации допуслуг гостиничного комплекса.
+    Система предоставляет гостям возможность:
+    - Бронировать допуслуги (баня, СПА, лежаки, столики)
+    - Заказывать еду в номер
+    - Вызывать персонал
+    - Записываться на мероприятия
+    Администраторы управляют услугами, ценами и отчётностью.
+    Персонал получает задачи в реальном времени.
+  version: 1.0.0
+  contact:
+    name: StayService Team
+servers:
+  - url: https://api.stayservice.example/v1
+    description: Production server
+  - url: https://dev-api.stayservice.example/v1
+    description: Development server
+
+tags:
+  - name: auth
+    description: Авторизация и аутентификация
+  - name: services
+    description: Услуги и слоты
+  - name: bookings
+    description: Бронирование допуслуг
+  - name: menu
+    description: Меню ресторана
+  - name: food-orders
+    description: Заказы еды
+  - name: requests
+    description: Вызов персонала
+  - name: events
+    description: Мероприятия и анимация
+  - name: dashboard
+    description: Личный кабинет
+  - name: admin
+    description: Админ-панель
+  - name: staff
+    description: Интерфейс для персонала
+  - name: integration
+    description: Интеграция с системой гостиницы
+
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Вход в систему
+      description: Авторизация гостя по номеру бронирования и коду доступа
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Успешная авторизация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Неверный формат данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Неверный код доступа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Слишком много попыток входа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Выход из системы
+      description: Завершение сессии пользователя
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Успешный выход
+        '401':
+          description: Не авторизован
+
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: Получение данных текущего пользователя
+      description: Информация о текущем авторизованном пользователе
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Успешное получение данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guest'
+        '401':
+          description: Не авторизован
+
+  /services:
+    get:
+      tags: [services]
+      summary: Получение списка услуг
+      description: Список всех доступных допуслуг
+      operationId: getServices
+      responses:
+        '200':
+          description: Успешное получение списка
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Service'
+
+  /services/{id}:
+    get:
+      tags: [services]
+      summary: Получение деталей услуги
+      description: Подробная информация об услуге
+      operationId: getServiceById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Успешное получение
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '404':
+          description: Услуга не найдена
+
+  /services/{id}/slots:
+    get:
+      tags: [services]
+      summary: Получение доступных слотов
+      description: Список временных слотов для услуги на указанную дату
+      operationId: getServiceSlots
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Успешное получение слотов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Slot'
+        '404':
+          description: Услуга не найдена
+
+  /bookings:
+    post:
+      tags: [bookings]
+      summary: Создание бронирования
+      description: Бронирование допуслуги на выбранный слот
+      operationId: createBooking
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingCreateRequest'
+      responses:
+        '201':
+          description: Бронирование успешно создано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          description: Неверный формат данных
+        '401':
+          description: Не авторизован
+        '409':
+          description: Слот уже занят
+    get:
+      tags: [bookings]
+      summary: Получение списка бронирований
+      description: Список всех бронирований текущего гостя
+      operationId: getBookings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Успешное получение списка
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+        '401':
+          description: Не авторизован
+
+  /bookings/{id}:
+    get:
+      tags: [bookings]
+      summary: Получение деталей бронирования
+      description: Подробная информация о бронировании
+      operationId: getBookingById
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Успешное получение
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '401':
+          description: Не авторизован
+        '404':
+          description: Бронирование не найдено
+    delete:
+      tags: [bookings]
+      summary: Отмена бронирования
+      description: Отмена существующего бронирования
+      operationId: cancelBooking
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Бронирование отменено
+        '401':
+          description: Не авторизован
+        '404':
+          description: Бронирование не найдено
+
+  /menu/categories:
+    get:
+      tags: [menu]
+      summary: Получение категорий меню
+      description: Список категорий блюд
+      operationId: getMenuCategories
+      responses:
+        '200':
+          description: Успешное получение категорий
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+
+  /menu/dishes:
+    get:
+      tags: [menu]
+      summary: Получение списка блюд
+      description: Список всех блюд меню
+      operationId: getDishes
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Успешное получение списка
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Dish'
+
+  /menu/dishes/{id}:
+    get:
+      tags: [menu]
+      summary: Получение деталей блюда
+      description: Подробная информация о блюде
+      operationId: getDishById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Успешное получение
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dish'
+        '404':
+          description: Блюдо не найдено
+
+  /food-orders:
+    post:
+      tags: [food-orders]
+      summary: Создание заказа еды
+      description: Оформление заказа еды в номер
+      operationId: createFoodOrder
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FoodOrderCreateRequest'
+      responses:
+        '201':
+          description: Заказ успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodOrder'
+        '400':
+          description: Неверный формат данных
+        '401':
+          description: Не авторизован
+    get:
+      tags: [food-orders]
+      summary: Получение списка заказов
+      description: Список всех заказов текущего гостя
+      operationId: getFoodOrders
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Успешное получение списка
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FoodOrder'
+        '401':
+          description: Не авторизован
+
+  /food-orders/{id}:
+    get:
+      tags: [food-orders]
+      summary: Получение деталей заказа
+      description: Подробная информация о заказе
+      operationId: getFoodOrderById
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Успешное получение
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodOrder'
+        '401':
+          description: Не авторизован
+        '404':
+          description: Заказ не найден
+    delete:
+      tags: [food-orders]
+      summary: Отмена заказа
+      description: Отмена существующего заказа
+      operationId: cancelFoodOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Заказ отменён
+        '401':
+          description: Не авторизован
+        '404':
+          description: Заказ не найден
+
+  /requests:
+    post:
+      tags: [requests]
+      summary: Создание заявки на персонал
+      description: Вызов персонала с указанием типа запроса
+      operationId: createRequest
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestCreateRequest'
+      responses:
+        '201':
+          description: Заявка успешно создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Request'
+        '400':
+          description: Неверный формат данных
+        '401':
+          description: Не авторизован
+    get:
+      tags: [requests]
+      summary: Получение списка заявок
+      description: Список всех заявок текущего гостя
+      operationId: getRequests
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Успешное получение списка
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Request'
+        '401':
+          description: Не авторизован
+
+  /requests/{id}:
+    get:
+      tags: [requests]
+      summary: Получение деталей заявки
+      description: Подробная информация о заявке
+      operationId: getRequestById
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Успешное получение
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Request'
+        '401':
+          description: Не авторизован
+        '404':
+          description: Заявка не найдена
+    put:
+      tags: [requests]
+      summary: Отмена заявки
+      description: Отмена существующей заявки
+      operationId: cancelRequest
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Заявка отменена
+        '401':
+          description: Не авторизован
+        '404':
+          description: Заявка не найдена
+
+  /requests/staff:
+    get:
+      tags: [requests, staff]
+      summary: Получение заявок для обработки
+      description: Список заявок, назначенных на сотрудника
+      operationId: getStaffRequests
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Успешное получение списка
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Request'
+        '401':
+          description: Не авторизован
+
+  /requests/{id}/status:
+    put:
+      tags: [requests, staff]
+      summary: Обновление статуса заявки
+      description: Изменение статуса заявки (персонал)
+      operationId: updateRequestStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestStatusUpdate'
+      responses:
+        '200':
+          description: Статус обновлён
+        '401':
+          description: Не авторизован
+        '404':
+          description: Заявка не найдена
+
+  /events:
+    get:
+      tags: [events]
+      summary: Получение списка мероприятий
+      description: Список всех мероприятий на текущую неделю
+      operationId: getEvents
+      parameters:
+        - name: date_from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Успешное получение списка
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+
+  /events/{id}:
+    get:
+      tags: [events]
+      summary: Получение деталей мероприятия
+      description: Подробная информация о мероприятии
+      operationId: getEventById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Успешное получение
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '404':
+          description: Мероприятие не найдено
+
+  /events/{id}/register:
+    post:
+      tags: [events]
+      summary: Запись на мероприятие
+      description: Регистрация гостя на мероприятие
+      operationId: registerForEvent
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '201':
+          description: Успешная регистрация
+        '400':
+          description: Неверный формат данных
+        '401':
+          description: Не авторизован
+        '409':
+          description: Места закончились
+    delete:
+      tags: [events]
+      summary: Отмена записи на мероприятие
+      description: Отмена регистрации на мероприятие
+      operationId: unregisterFromEvent
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Регистрация отменена
+        '401':
+          description: Не авторизован
+        '404':
+          description: Регистрация не найдена
+
+  /dashboard:
+    get:
+      tags: [dashboard]
+      summary: Получение общей информации
+      description: Обзор всех активных действий гостя
+      operationId: getDashboard
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Успешное получение данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+        '401':
+          description: Не авторизован
+
+  /integration/check-in:
+    post:
+      tags: [integration]
+      summary: Приём данных гостя от системы бронирования
+      description: Интеграция с системой бронирования гостиницы
+      operationId: checkInIntegration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckInData'
+      responses:
+        '200':
+          description: Данные успешно получены
+        '400':
+          description: Неверный формат данных
+
+components:
+  schemas:
+    LoginRequest:
+      type: object
+      required: [booking_number, auth_code]
+      properties:
+        booking_number:
+          type: string
+          example: "BK7391"
+        auth_code:
+          type: string
+          example: "1234"
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        guest:
+          $ref: '#/components/schemas/Guest'
+
+    Guest:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        booking_number:
+          type: string
+          example: "BK7391"
+        name:
+          type: string
+          example: "Иван Петров"
+        room_number:
+          type: string
+          example: "205"
+        check_in:
+          type: string
+          format: date
+          example: "2026-02-01"
+        check_out:
+          type: string
+          format: date
+          example: "2026-02-05"
+
+    Staff:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Мария Сидорова"
+        email:
+          type: string
+          example: "staff@hotel.com"
+        role:
+          type: string
+          enum: [admin, housekeeper, chef, technician, animator]
+          example: "housekeeper"
+        phone:
+          type: string
+          example: "+79991234567"
+        is_active:
+          type: boolean
+          example: true
+
+    Service:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Баня «Дубовая»"
+        type:
+          type: string
+          enum: [banya, spa, lezhak, stolik]
+          example: "banya"
+        description:
+          type: string
+          example: "Русская баня с парной и зоной отдыха"
+        price:
+          type: number
+          format: float
+          example: 2000.0
+        duration_minutes:
+          type: integer
+          example: 120
+        capacity:
+          type: integer
+          example: 6
+        is_active:
+          type: boolean
+          example: true
+
+    Slot:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        service_id:
+          type: integer
+          example: 1
+        date:
+          type: string
+          format: date
+          example: "2026-02-02"
+        time_start:
+          type: string
+          format: time
+          example: "18:00"
+        time_end:
+          type: string
+          format: time
+          example: "20:00"
+        status:
+          type: string
+          enum: [free, booked]
+          example: "free"
+
+    BookingCreateRequest:
+      type: object
+      required: [slot_id]
+      properties:
+        slot_id:
+          type: integer
+          example: 1
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        guest_id:
+          type: integer
+          example: 1
+        slot_id:
+          type: integer
+          example: 1
+        service:
+          $ref: '#/components/schemas/Service'
+        slot:
+          $ref: '#/components/schemas/Slot'
+        status:
+          type: string
+          enum: [active, cancelled]
+          example: "active"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-02-01T10:00:00Z"
+        cancelled_at:
+          type: string
+          format: date-time
+          example: "2026-02-01T11:00:00Z"
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Завтраки"
+        code:
+          type: string
+          example: "breakfast"
+
+    Dish:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Омлет классический"
+        category:
+          type: string
+          example: "breakfast"
+        description:
+          type: string
+          example: "Омлет из 2 яиц с сыром"
+        price:
+          type: number
+          format: float
+          example: 350.0
+        is_available:
+          type: boolean
+          example: true
+
+    FoodOrderCreateRequest:
+      type: object
+      required: [items, delivery_time]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemCreate'
+        delivery_time:
+          type: string
+          format: date-time
+          example: "2026-02-02T13:00:00Z"
+        special_requests:
+          type: string
+          example: "Без лука, остро"
+
+    OrderItemCreate:
+      type: object
+      required: [dish_id, quantity]
+      properties:
+        dish_id:
+          type: integer
+          example: 1
+        quantity:
+          type: integer
+          example: 2
+        special_requests:
+          type: string
+          example: "Хорошо прожарить"
+
+    FoodOrder:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        guest_id:
+          type: integer
+          example: 1
+        room_number:
+          type: string
+          example: "205"
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        delivery_time:
+          type: string
+          format: date-time
+          example: "2026-02-02T13:00:00Z"
+        status:
+          type: string
+          enum: [new, cooking, delivered, cancelled]
+          example: "new"
+        total_amount:
+          type: number
+          format: float
+          example: 700.0
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-02-01T12:00:00Z"
+
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        order_id:
+          type: integer
+          example: 1
+        dish:
+          $ref: '#/components/schemas/Dish'
+        quantity:
+          type: integer
+          example: 2
+        special_requests:
+          type: string
+          example: "Хорошо прожарить"
+
+    RequestCreateRequest:
+      type: object
+      required: [request_type, description]
+      properties:
+        request_type:
+          type: string
+          enum: [housekeeping, tech_support, towels, other]
+          example: "housekeeping"
+        description:
+          type: string
+          example: "Нужна уборка номера"
+
+    RequestStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [new, in_progress, completed, rejected]
+          example: "in_progress"
+
+    Request:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        guest_id:
+          type: integer
+          example: 1
+        room_number:
+          type: string
+          example: "205"
+        request_type:
+          type: string
+          enum: [housekeeping, tech_support, towels, other]
+          example: "housekeeping"
+        description:
+          type: string
+          example: "Нужна уборка номера"
+        status:
+          type: string
+          enum: [new, in_progress, completed, rejected]
+          example: "new"
+        assigned_to:
+          type: integer
+          example: 1
+        assigned_staff:
+          $ref: '#/components/schemas/Staff'
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-02-01T10:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-02-01T10:30:00Z"
+        completed_at:
+          type: string
+          format: date-time
+          example: "2026-02-01T11:00:00Z"
+
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Детская анимация"
+        description:
+          type: string
+          example: "Интерактивная программа для детей 5-12 лет"
+        event_date:
+          type: string
+          format: date
+          example: "2026-02-02"
+        time_start:
+          type: string
+          format: time
+          example: "15:00"
+        duration_minutes:
+          type: integer
+          example: 60
+        max_participants:
+          type: integer
+          example: 20
+        current_participants:
+          type: integer
+          example: 15
+        is_active:
+          type: boolean
+          example: true
+
+    Dashboard:
+      type: object
+      properties:
+        active_bookings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Booking'
+        active_orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/FoodOrder'
+        active_requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/Request'
+        upcoming_events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+
+    CheckInData:
+      type: object
+      required: [booking_number, auth_code, room_number]
+      properties:
+        booking_number:
+          type: string
+          example: "BK7391"
+        auth_code:
+          type: string
+          example: "1234"
+        room_number:
+          type: string
+          example: "205"
+        guest_name:
+          type: string
+          example: "Иван Петров"
+        check_in:
+          type: string
+          format: date
+          example: "2026-02-01"
+        check_out:
+          type: string
+          format: date
+          example: "2026-02-05"
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: "AUTH_FAILED"
+        message:
+          type: string
+          example: "Неверный код доступа"
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

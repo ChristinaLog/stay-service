@@ -57,8 +57,7 @@
 
 ## Диаграмма контекста (C4 Level 1)
 
-![C4 Диаграмма контекста](architecture/images/c4.png)
-[Ссылка на диаграмму](architecture/images/c4.png)
+[C4 Диаграмма контекста](images/c4.png)
 
 ## Описание потоков данных
 

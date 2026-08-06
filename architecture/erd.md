@@ -2,8 +2,8 @@
 
 ## Визуальная схема базы данных
 
-![ER-диаграмма базы данных StayService](architecture/images/erd.png)
-[Ссылка на схему](architecture/images/erd.png)
+![ER-диаграмма базы данных StayService](images/erd.png)
+[Ссылка на схему](images/erd.png)
 
 ## Ключевые сущности
 
